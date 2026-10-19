@@ -1,7 +1,7 @@
 name: Linter Check
 on:
   pull_request:
-    branches: [ "develop" ]
+    branches: [ "main" ]
 jobs:
   lint:
     runs-on: ubuntu-latest
