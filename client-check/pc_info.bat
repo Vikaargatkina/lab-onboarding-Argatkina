@@ -1,51 +1,55 @@
 @echo off
-chcp 65001 >nul
-REM Тема: Диагностика клиентского компьютера. Фамилия: Аргаткина. Дата: 26.10.2026
+chcp 65001 > nul
 
-set REPORT_FILE=%~dp0pc_report.txt
+SET "REPORT=%~dp0pc_report.txt"
 
-(
-echo ==========================================
-echo        Диагностика компьютера
-echo ==========================================
+echo Диагностика компьютера > "%REPORT%"
+echo ---------------------------------------- >> "%REPORT%"
+
+echo ========================================
+echo        ДИАГНОСТИКА КОМПЬЮТЕРА
+echo ========================================
 echo.
 
-REM Сведения об операционной системе
 echo [Операционная система]
-for /f "tokens=2 delims==" %%a in ('wmic os get Caption /format:list') do echo Название: %%a
-for /f "tokens=2 delims==" %%a in ('wmic os get Version /format:list') do echo Версия: %%a
-echo.
+echo [Операционная система] >> "%REPORT%"
+wmic os get Caption,Version /format:list
+wmic os get Caption,Version /format:list >> "%REPORT%"
+echo ----------------------------------------
+echo ---------------------------------------- >> "%REPORT%"
 
-REM Сведения о процессоре
 echo [Процессор]
-for /f "skip=1 delims=" %%a in ('wmic cpu get name') do echo %%a & goto :next1
-:next1
-echo.
+echo [Процессор] >> "%REPORT%"
+wmic cpu get Name /format:list
+wmic cpu get Name /format:list >> "%REPORT%"
+echo ----------------------------------------
+echo ---------------------------------------- >> "%REPORT%"
 
-REM Сведения об оперативной памяти
-echo [Оперативная память]
-for /f "tokens=2 delims==" %%a in ('wmic OS get TotalVisibleMemorySize /format:list') do set /a TOTAL_GB=%%a / 1048576
-for /f "tokens=2 delims==" %%a in ('wmic OS get FreePhysicalMemory /format:list') do set /a FREE_GB=%%a / 1048576
-echo Всего памяти: %TOTAL_GB% ГБ
-echo Свободно памяти: %FREE_GB% ГБ
-echo.
+echo [Оперативная память (в КБ, округление до ГБ в уме)]
+echo [Оперативная память] >> "%REPORT%"
+wmic OS get TotalVisibleMemorySize,FreePhysicalMemory /format:list
+wmic OS get TotalVisibleMemorySize,FreePhysicalMemory /format:list >> "%REPORT%"
+echo ----------------------------------------
+echo ---------------------------------------- >> "%REPORT%"
 
-REM Свободное место на диске C
-echo [Диск C:]
-for /f "tokens=2 delims==" %%a in ('wmic logicaldisk where DeviceID="C:" get Size /format:list') do set /a SIZE_GB=%%a / 1073741824
-for /f "tokens=2 delims==" %%a in ('wmic logicaldisk where DeviceID="C:" get FreeSpace /format:list') do set /a FREE_DISK_GB=%%a / 1073741824
-echo Общий размер: %SIZE_GB% ГБ
-echo Свободно: %FREE_DISK_GB% ГБ
-echo.
+echo [Диск C (в байтах)]
+echo [Диск C] >> "%REPORT%"
+wmic logicaldisk where DeviceID="C:" get Size,FreeSpace /format:list
+wmic logicaldisk where DeviceID="C:" get Size,FreeSpace /format:list >> "%REPORT%"
+echo ----------------------------------------
+echo ---------------------------------------- >> "%REPORT%"
 
-REM Список установленных программ
 echo [Установленные программы]
-echo Идёт поиск программ, это может занять несколько минут...
-wmic product get name
+echo [Установленные программы] >> "%REPORT%"
+echo Идёт сбор списка программ, пожалуйста, подождите...
 echo.
 
-echo Отчёт сохранён в pc_report.txt
-) > "%REPORT_FILE%"
+powershell -NoProfile -Command "Get-ItemProperty HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\*, HKLM:\Software\Wow6432Node\Microsoft\Windows\CurrentVersion\Uninstall\* 2>$null | Select-Object -Property DisplayName | Where-Object {$_.DisplayName -ne $null} | ForEach-Object {$_.DisplayName}" 
 
-type "%REPORT_FILE%"
+powershell -NoProfile -Command "Get-ItemProperty HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\*, HKLM:\Software\Wow6432Node\Microsoft\Windows\CurrentVersion\Uninstall\* 2>$null | Select-Object -Property DisplayName | Where-Object {$_.DisplayName -ne $null} | ForEach-Object {$_.DisplayName}" >> "%REPORT%"
+
+echo.
+echo ========================================
+echo Отчёт успешно сохранён в файл pc_report.txt
+echo ========================================
 pause
