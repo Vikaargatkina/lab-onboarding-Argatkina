@@ -1,91 +1,72 @@
 @echo off
 chcp 65001 > nul
+set "REPORT=%~dp0pc_report.txt"
 
-REM =========================================================
-REM Тема: Инструментальные средства ревьюирования
-REM Фамилия: Аргаткина
-REM Дата: 31.10.2026
-REM =========================================================
+:: Очистка старого отчета
+type nul > "%REPORT%"
 
-SET "REPORT=%~dp0pc_report.txt"
+echo [1/5] Инициализация диагностики...
+call :log "========================================"
+call :log "         ДИАГНОСТИКА КОМПЬЮТЕРА         "
+call :log "========================================"
+call :log "Дата и время проверки: %date% %time%"
+call :log "----------------------------------------"
 
-echo Диагностика компьютера > "%REPORT%"
-echo ---------------------------------------- >> "%REPORT%"
+echo [2/5] Сбор сведений о системе...
+call :log "--- Операционная система ---"
+for /f "tokens=2 delims==" %%i in ('wmic os get Caption^,Version /value 2^>nul ^| findstr "="') do call :log "%%i"
 
-echo ========================================
-echo        ДИАГНОСТИКА КОМПЬЮТЕРА
-echo ========================================
-echo.
+call :log ""
+call :log "--- Процессор ---"
+for /f "tokens=2 delims==" %%i in ('wmic cpu get Name /value 2^>nul ^| findstr "="') do call :log "%%i"
 
-REM --- СВЕДЕНИЯ ОБ ОБЕРАЦИОННОЙ СИСТЕМЕ ---
-echo [Операционная система]
-echo [Операционная система] >> "%REPORT%"
-for /f "tokens=2 delims==" %%i in ('wmic os get Caption /format:list 2^>nul') do (
-    echo Название: %%i
-    echo Название: %%i >> "%REPORT%"
+echo [3/5] Получение списка программ...
+:: Сохраняем реестр во временный файл
+reg query "HKLM\Software\Microsoft\Windows\CurrentVersion\Uninstall" /s /f "DisplayName" 2>nul | findstr "DisplayName" > "%TEMP%\apps.txt"
+reg query "HKLM\Software\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall" /s /f "DisplayName" 2>nul | findstr "DisplayName" >> "%TEMP%\apps.txt"
+
+echo [4/5] Проведение аудита ПО...
+call :log ""
+call :log "========================================"
+call :log "          РАЗДЕЛ РЕКОМЕНДАЦИЙ           "
+call :log "========================================"
+
+call :log "--- Проверка базового офисного ПО ---"
+findstr /I "7-Zip WinRAR" "%TEMP%\apps.txt" >nul
+if %errorlevel% equ 0 (
+    call :log "[ОК] Архиватор обнаружен."
+) else (
+    call :log "[РЕКОМЕНДАЦИЯ] Не обнаружен архиватор. Рекомендуется установить 7-Zip."
 )
-for /f "tokens=2 delims==" %%i in ('wmic os get Version /format:list 2^>nul') do (
-    echo Версия: %%i
-    echo Версия: %%i >> "%REPORT%"
+
+findstr /I "Office LibreOffice МойОфис" "%TEMP%\apps.txt" >nul
+if %errorlevel% equ 0 (
+    call :log "[ОК] Офисный пакет обнаружен."
+) else (
+    call :log "[РЕКОМЕНДАЦИЯ] Не обнаружен офисный пакет. Рекомендуется установить МойОфис или LibreOffice."
 )
-echo ----------------------------------------
-echo ---------------------------------------- >> "%REPORT%"
 
-REM --- СВЕДЕНИЯ О ПРОЦЕССОРЕ ---
-echo [Процессор]
-echo [Процессор] >> "%REPORT%"
-for /f "tokens=2 delims==" %%i in ('wmic cpu get Name /format:list 2^>nul') do (
-    echo Модель: %%i
-    echo Модель: %%i >> "%REPORT%"
+call :log ""
+call :log "--- Проверка излишнего / нецелевого ПО ---"
+findstr /I "Steam Epic Discord uTorrent BitTorrent" "%TEMP%\apps.txt" >nul
+if %errorlevel% equ 0 (
+    call :log "[ТРЕБУЕТ ПРОВЕРКИ] Игровое или нецелевое ПО (Steam, uTorrent или Discord)."
+) else (
+    call :log "[ОК] Излишнее ПО не обнаружено."
 )
-echo ----------------------------------------
-echo ---------------------------------------- >> "%REPORT%"
 
-REM --- СВЕДЕНИЯ ОБ ОПЕРАТИВНОЙ ПАМЯТИ ---
-echo [Оперативная память]
-echo [Оперативная память] >> "%REPORT%"
-set "total_kb=0"
-set "free_kb=0"
-for /f "tokens=2 delims==" %%i in ('wmic OS get TotalVisibleMemorySize /format:list 2^>nul') do set "total_kb=%%i"
-for /f "tokens=2 delims==" %%i in ('wmic OS get FreePhysicalMemory /format:list 2^>nul') do set "free_kb=%%i"
-set /a total_gb=%total_kb% / 1048576
-set /a free_gb=%free_kb% / 1048576
-echo Всего памяти: %total_gb% ГБ
-echo Свободно памяти: %free_gb% ГБ
-echo Всего памяти: %total_gb% ГБ >> "%REPORT%"
-echo Свободно памяти: %free_gb% ГБ >> "%REPORT%"
-echo ----------------------------------------
-echo ---------------------------------------- >> "%REPORT%"
+if exist "%TEMP%\apps.txt" del "%TEMP%\apps.txt"
 
-REM --- СВЕДЕНИЯ О СВОБОДНОМ МЕСТЕ НА ДИСКЕ ---
-echo [Диск C]
-echo [Диск C] >> "%REPORT%"
-set "disk_size=0"
-set "disk_free=0"
-for /f "tokens=2 delims==" %%i in ('wmic logicaldisk where DeviceID="C:" get Size /format:list 2^>nul') do set "disk_size=%%i"
-for /f "tokens=2 delims==" %%i in ('wmic logicaldisk where DeviceID="C:" get FreeSpace /format:list 2^>nul') do set "disk_free=%%i"
-set "size_trimmed=%disk_size:~0,-6%"
-set "free_trimmed=%disk_free:~0,-6%"
-set /a size_gb=%size_trimmed% / 1073
-set /a free_gb=%free_trimmed% / 1073
-echo Общий размер: %size_gb% ГБ
-echo Свободно места: %free_gb% ГБ
-echo Общий размер: %size_gb% ГБ >> "%REPORT%"
-echo Свободно места: %free_gb% ГБ >> "%REPORT%"
-echo ----------------------------------------
-echo ---------------------------------------- >> "%REPORT%"
-
-REM --- СПИСОК УСТАНОВЛЕННЫХ ПРОГРАММ ---
-echo [Установленные программы]
-echo [Установленные программы] >> "%REPORT%"
-echo Идёт сбор списка программ, пожалуйста, подождите...
-echo.
-powershell -NoProfile -Command "Get-ItemProperty HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\*, HKLM:\Software\Wow6432Node\Microsoft\Windows\CurrentVersion\Uninstall\* 2>$null | Select-Object -Property DisplayName | Where-Object {$_.DisplayName -ne $null} | ForEach-Object {$_.DisplayName}"
-powershell -NoProfile -Command "Get-ItemProperty HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\*, HKLM:\Software\Wow6432Node\Microsoft\Windows\CurrentVersion\Uninstall\* 2>$null | Select-Object -Property DisplayName | Where-Object {$_.DisplayName -ne $null} | ForEach-Object {$_.DisplayName}" >> "%REPORT%"
-
-echo.
-echo ========================================
-echo Отчёт сохранён
-echo ========================================
+echo [5/5] Настройка завершена!
+call :log ""
+call :log "Отчет сохранен в файл pc_report.txt"
 pause
+exit /b
 
+:: ==========================================
+:: ПОДПРОГРАММА ВЫВОДА LOG
+:: ==========================================
+:log
+echo(%~1
+echo(%~1 >> "%REPORT%"
+exit /b
